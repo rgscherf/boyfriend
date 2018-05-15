@@ -27,10 +27,10 @@ Loops terminate with an error if the sentinel value is x < -500 or x > 500.
 From the Clojure repl:
 
 ```clojure
-(require 'boyfriend.core :as bf)
+(use 'boyfriend.core)
 
 (let [source-code "++.>>--."]
-  (bf/eval-boyfriend source-code))
+  (eval-boyfriend source-code))
 ```
 
 ## License
