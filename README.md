@@ -1,8 +1,8 @@
 # boyfriend
 
-Boyfriend (n): A brainfuck that keeps making the same mistakes.
+Boyfriend (n): a brainfuck that keeps making the same mistakes.
 
-Boyfriend is the Brainfuck language you know and love, with a couple of modern
+It's the bf language you know and love, with a couple of modern
 conveniences.
 
 ## Features

@@ -67,7 +67,7 @@
 (declare do-loop)
 (defn- single-expr
   "Evaluate a single BF expression, taking and receiving a [tape ptr] env."
-  [[tape ptr :as current] [expr-type & exprs :as val-expr]]
+  [current [expr-type & exprs]]
   (cond
     (= expr-type :LOOP) (do-loop current exprs)
     (= expr-type :PRINT) (do
@@ -103,7 +103,7 @@
 (defn- do-loop
   "at the beginning of a LOOP, check whether tape[ptr] == 0.  If yes, return the tape.
   If no, run to the end of the loop and then test again with the resulting tape but initial pointer."
-  [[init-tape ptr :as initial] loop-exprs]
+  [[init-tape ptr] loop-exprs]
   (loop [exprs loop-exprs tape init-tape constant-ptr ptr]
     (let [ptrval (val-at-ptr [tape constant-ptr])]
       (cond
