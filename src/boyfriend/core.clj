@@ -8,7 +8,9 @@
 (defn- parse-string
   []
   "S = EXPR+
-  <EXPR> = INVOKE | FUNC | LOOP | PRINT | INCVAL | DECVAL | MOVRIGHT | MOVLEFT
+  <EXPR> = CPYRIGHT | CPYLEFT | INVOKE | FUNC | LOOP | PRINT | INCVAL | DECVAL | MOVRIGHT | MOVLEFT
+  CPYRIGHT = <')'>
+  CPYLEFT = <'('>
   LOOP = <'['> EXPR+ <']'>
   FUNC = <'{'> EXPR+ <'}'>
   INVOKE = ';'
@@ -54,6 +56,20 @@
   [{:keys [tape ptr] :as input}]
   (assoc input :ptr (move-pointer* tape ptr inc)))
 
+(defn- copy*
+  [{:keys [_ ptr] :as input} move-ptr-fn]
+  (let [val-at-current-ptr (val-at-ptr input)
+        moved-ptr (move-ptr-fn input)]
+    (assoc moved-ptr :tape (assoc (:tape moved-ptr) (:ptr moved-ptr) val-at-current-ptr))))
+
+(defn- copy-left
+  [input]
+  (copy* input move-pointer-left))
+
+(defn- copy-right
+  [input]
+  (copy* input move-pointer-right))
+
 ;;;;;;;;;;;;;;;;;;;
 ;; EVAL FNs
 ;;;;;;;;;;;;;;;;;;;
@@ -87,6 +103,8 @@
   [current [expr-type & exprs]]
   (cond
     (= expr-type :LOOP) (do-loop current exprs)
+    (= expr-type :CPYLEFT)  (copy-left current)
+    (= expr-type :CPYRIGHT)  (copy-right current)
     (= expr-type :FUNC) (intern-fn current exprs)
     (= expr-type :INVOKE) (invoke-fn current)
     (= expr-type :PRINT) (print-char current)
