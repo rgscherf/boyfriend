@@ -8,8 +8,10 @@
 (defn- parse-string
   []
   "S = EXPR+
-  <EXPR> = LOOP | PRINT | INCVAL | DECVAL | MOVRIGHT | MOVLEFT
+  <EXPR> = INVOKE | FUNC | LOOP | PRINT | INCVAL | DECVAL | MOVRIGHT | MOVLEFT
   LOOP = <'['> EXPR+ <']'>
+  FUNC = <'{'> EXPR+ <'}'>
+  INVOKE = ';'
   PRINT = <','>
   INCVAL = <'+'>
   DECVAL = <'-'>
@@ -25,7 +27,7 @@
 ;;;;;;;;;;;;;;;;;;;
 
 (defn- val-at-ptr
-  [[tape ptr]]
+  [{:keys [tape ptr]}]
   (get tape ptr))
 
 (defn- modify-tape-val*
@@ -33,27 +35,24 @@
   (update tape idx func))
 
 (defn- dec-pointer
-  [[tape pointer-idx]]
-  [(modify-tape-val* tape pointer-idx dec)  pointer-idx])
+  [{:keys [tape ptr] :as input}]
+  (assoc input :tape (modify-tape-val* tape ptr dec)))
 
 (defn- inc-pointer
-  [[tape pointer-idx]]
-  [(modify-tape-val* tape pointer-idx inc) pointer-idx])
+  [{:keys [tape ptr] :as input}]
+  (assoc input :tape (modify-tape-val* tape ptr inc)))
 
 (defn- move-pointer*
   [tape oldidx func]
-  (let [newidx (mod
-                (func oldidx)
-                (count tape))]
-    [tape newidx]))
+  (mod (func oldidx) (count tape)))
 
 (defn- move-pointer-left
-  [[tape pointer-idx]]
-  (move-pointer* tape pointer-idx dec))
+  [{:keys [tape ptr] :as input}]
+  (assoc input :ptr (move-pointer* tape ptr dec)))
 
 (defn- move-pointer-right
-  [[tape pointer-idx]]
-  (move-pointer* tape pointer-idx inc))
+  [{:keys [tape ptr] :as input}]
+  (assoc input :ptr (move-pointer* tape ptr inc)))
 
 ;;;;;;;;;;;;;;;;;;;
 ;; EVAL FNs
@@ -61,15 +60,25 @@
 
 (defn- new-tape
   "Create a new BF env of [tape ptr]"
-  []
-  [(into [] (repeat 10 0)) 0])
+  [debug]
+  (if debug
+    {:ptr 0
+     :tape (into [] (repeat 10 0))
+     :bindings {}}
+    {:ptr 500
+     :tape (into [] (repeat 1000 0))
+     :bindings {}}))
 
 (declare do-loop)
+(declare intern-fn)
+(declare invoke-fn)
 (defn- single-expr
   "Evaluate a single BF expression, taking and receiving a [tape ptr] env."
   [current [expr-type & exprs]]
   (cond
     (= expr-type :LOOP) (do-loop current exprs)
+    (= expr-type :FUNC) (intern-fn current exprs)
+    (= expr-type :INVOKE) (invoke-fn current)
     (= expr-type :PRINT) (do
                            (print (val-at-ptr current))
                            current)
@@ -89,7 +98,7 @@
 
 (defn- parse-fresh-exprs
   [expr-coll]
-  (parse-exprs* (new-tape) (rest expr-coll)))
+  (parse-exprs* (new-tape true) (rest expr-coll)))
 
 (defn eval-boyfriend
   "Fully evaluate a boyfriend string, returning the tape and current pointer val."
@@ -103,40 +112,57 @@
 (defn- do-loop
   "at the beginning of a LOOP, check whether tape[ptr] == 0.  If yes, return the tape.
   If no, run to the end of the loop and then test again with the resulting tape but initial pointer."
-  [[init-tape ptr] loop-exprs]
-  (loop [exprs loop-exprs tape init-tape constant-ptr ptr]
-    (let [ptrval (val-at-ptr [tape constant-ptr])]
+  [{:keys [tape ptr bindings] :as current}  loop-exprs]
+  (loop [exprs loop-exprs tape tape constant-ptr ptr loop-bindings bindings]
+    (let [ptrval (val-at-ptr current)]
       (cond
         (= 0 ptrval)
         [tape ptr]
         (or (> -500 ptrval) (> ptrval 500))
         (throw (Exception. (str "The pointer val was too big or too small! Exiting to prevent infinite loop. Val was " ptrval)))
         :default
-        (let [[new-tape _] (parse-exprs-w-env [tape constant-ptr] exprs)]
-          (recur exprs new-tape constant-ptr))))))
+        (let [new-env (parse-exprs-w-env {:tape tape :ptr constant-ptr :bindings loop-bindings}
+                                         exprs)
+              new-bindings (:bindings new-env)
+              new-tape (:tape new-env)]
+          (recur exprs new-tape constant-ptr new-bindings))))))
+
+(defn- intern-fn
+  "When a fn definition is encountered, save its exprs in the env with key = current tape value."
+  [{:keys [bindings] :as current} fn-exprs]
+  (let [envkey (val-at-ptr current)]
+    (assoc current :bindings (assoc bindings envkey fn-exprs))))
+
+(defn- lookup-fn
+  [env]
+  (let [location (val-at-ptr env)
+        result (get (:bindings env) location)]
+    (if result
+      result
+      (throw (Exception. (str "No function stored at ptr location " location ". Current env map: " env))))))
+
+(defn- invoke-fn
+  "Lookup the current value at pointer and then apply its fn. 
+  If no fn for that key, throw an error."
+  [current]
+  (let [called-exprs (lookup-fn current)]
+    (parse-exprs-w-env current called-exprs)))
+
+(def testenv
+  {:ptr 0, :tape [1 0 0], :bindings {1 [[:DECVAL]]}})
 
 (comment
 
-  (parse-exprs-w-env [[1 0 1] 0] [[:DECVAL]])
+  (invoke-fn testenv)
 
-  (val-at-ptr [[1 0 1] 0])
+  (lookup-fn testenv)
 
-  (do-loop
-   [[2 0 1] 0]
-   [[:DECVAL] [:DECVAL]])
+  (val-at-ptr {:ptr 0, :tape [1 0 0], :bindings {1 [[:DECVAL]]}})
 
-  (parse-exprs-w-env
-   [[1 0 1] 0]
-   [[:DECVAL] [:DECVAL]])
+  (parse-exprs-w-env {:ptr 0, :tape [1 0 0], :bindings {1 [[:DECVAL]]}} [[:DECVAL]])
 
-  (def loop-tape
-    [[0 1 0 0 0 0 0] 1])
+  (eval-boyfriend "++{>++};;++{<<<-----}>++++;")
 
-  (def loop-test
-    [[:DECVAL "-"] [:DECVAL "-"] [:MOVRIGHT ">"] [:INCVAL "+"]])
+  (parser "++>{++}")
 
-  (do-loop loop-tape loop-test)
-
-  (eval-bf "+++[,-]")
-
-  "This is a comment.")
+  "endcomment")
