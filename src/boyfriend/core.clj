@@ -12,7 +12,7 @@
   LOOP = <'['> EXPR+ <']'>
   FUNC = <'{'> EXPR+ <'}'>
   INVOKE = ';'
-  PRINT = <','>
+  PRINT = <'.'>
   INCVAL = <'+'>
   DECVAL = <'-'>
   MOVRIGHT = <'>'>
@@ -69,6 +69,16 @@
      :tape (into [] (repeat 1000 0))
      :bindings {}}))
 
+(defn- print-char
+  [current]
+  (-> current
+      val-at-ptr
+      (#(mod % 127))
+      Character/toChars
+      String/valueOf
+      print)
+  current)
+
 (declare do-loop)
 (declare intern-fn)
 (declare invoke-fn)
@@ -79,9 +89,7 @@
     (= expr-type :LOOP) (do-loop current exprs)
     (= expr-type :FUNC) (intern-fn current exprs)
     (= expr-type :INVOKE) (invoke-fn current)
-    (= expr-type :PRINT) (do
-                           (print (val-at-ptr current))
-                           current)
+    (= expr-type :PRINT) (print-char current)
     (= expr-type :INCVAL) (inc-pointer current)
     (= expr-type :DECVAL) (dec-pointer current)
     (= expr-type :MOVRIGHT) (move-pointer-right current)
@@ -134,6 +142,8 @@
     (assoc current :bindings (assoc bindings envkey fn-exprs))))
 
 (defn- lookup-fn
+  "Look up function for current pointer value.
+  If no fn exists for that value, throw an error."
   [env]
   (let [location (val-at-ptr env)
         result (get (:bindings env) location)]
@@ -153,6 +163,12 @@
 
 (comment
 
+  (eval-boyfriend ">>++>>")
+
+  (printchar testenv)
+
+  (String/valueOf (Character/toChars 65))
+
   (invoke-fn testenv)
 
   (lookup-fn testenv)
@@ -162,6 +178,8 @@
   (parse-exprs-w-env {:ptr 0, :tape [1 0 0], :bindings {1 [[:DECVAL]]}} [[:DECVAL]])
 
   (eval-boyfriend "++{>++};;++{<<<-----}>++++;")
+
+  (eval-boyfriend "+++..")
 
   (parser "++>{++}")
 

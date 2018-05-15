@@ -7,7 +7,7 @@ conveniences.
 
 ## Features
 
-Brainfuck operators +-,.[] work as you expect. 
+Brainfuck operators +-.[] work as you expect. 
 
 The banner addition is functions. Enclose any expression(s) in `{}` to save
 them as a function. The function is keyed to the **value of the tape at the
@@ -21,6 +21,9 @@ The tape has 1000 cells. Going outside the tape's index wraps the pointer
 around to the other end.
 
 Loops terminate with an error if the sentinel value is x < -500 or x > 500.
+
+Printing uses the ASCII character set. The character you get is (mod
+val-at-data-pointer 127).
 
 ## Usage
 
