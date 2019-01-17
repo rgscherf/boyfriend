@@ -7,7 +7,7 @@ conveniences.
 
 ## Features
 
-Brainfuck operators +-.[] work as you expect. 
+Brainfuck operators +-<>.[] work as you expect. 
 
 The banner addition is functions. Enclose any expression(s) in `{}` to save
 them as a function. The function is keyed to the **value of the tape at the
